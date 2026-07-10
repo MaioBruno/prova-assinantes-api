@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AssinantesApi.Data;
 using AssinantesApi.Entities;
+using AssinantesApi.DTOs;
 
 namespace AssinantesApi.Controllers
 {
@@ -17,21 +18,44 @@ namespace AssinantesApi.Controllers
         }
 
         [HttpPost] // POST /assinantes
-        public async Task<IActionResult> Criar([FromBody] Assinante assinante)
+        public async Task<IActionResult> Criar([FromBody] AssinanteCreateDTO dto)
         {
-            if (assinante == null) return BadRequest("Dados do assinante inválidos.");
-
-            if (assinante.DataInicioAssinatura > DateTime.UtcNow)
-                return BadRequest("A data de início da assinatura não pode ser maior que a data atual.");
-
-            bool emailEmUso = await _context.Assinantes.AnyAsync(a => a.Email == assinante.Email);
+            // 1. Validar se o e-mail já existe (usando o DTO)
+            bool emailEmUso = await _context.Assinantes.AnyAsync(a => a.Email == dto.Email);
             if (emailEmUso) return BadRequest("Este e-mail já está cadastrado no sistema.");
 
-            assinante.Id = Guid.NewGuid();
+            // 2. Validar data (usando o DTO)
+            if (dto.DataInicioAssinatura > DateTime.UtcNow)
+                return BadRequest("A data de início da assinatura não pode ser maior que a data atual.");
+
+            // 3. Mapear DTO para Entidade
+            var assinante = new Assinante {
+                Id = Guid.NewGuid(), // Geramos o ID aqui na Entidade, não no DTO
+                NomeCompleto = dto.NomeCompleto,
+                Email = dto.Email,
+                DataInicioAssinatura = dto.DataInicioAssinatura,
+                Plano = dto.Plano,
+                ValorMensal = dto.ValorMensal,
+                Status = Status.Ativo // Definimos o padrão
+            };
+
+            // 4. Salvar
             _context.Assinantes.Add(assinante);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(ObterPorId), new { id = assinante.Id }, assinante);
+            // 5. Retornar um ResponseDTO (boa prática não expor a entidade direto)
+            var response = new AssinanteResponseDTO {
+                Id = assinante.Id,
+                NomeCompleto = assinante.NomeCompleto,
+                Email = assinante.Email,
+                DataInicioAssinatura = assinante.DataInicioAssinatura,
+                Plano = assinante.Plano,
+                ValorMensal = assinante.ValorMensal,
+                Status = assinante.Status,
+                TempoDeAssinaturaEmMeses = assinante.TempoDeAssinaturaEmMeses
+            };
+
+            return CreatedAtAction(nameof(ObterPorId), new { id = assinante.Id }, response);
         }
 
         [HttpGet] // GET /assinantes
@@ -45,63 +69,67 @@ namespace AssinantesApi.Controllers
             if (page < 1) page = 1;
             if (size < 1) size = 10;
 
-            var assinantes = await _context.Assinantes
-                .Where(a => a.Status == Status.Ativo)
-                .OrderBy(a => a.NomeCompleto) 
+            var assinantes = await query
+                .OrderBy(a => a.NomeCompleto)
                 .Skip((page - 1) * size)
                 .Take(size)
+                .Select(a => new AssinanteResponseDTO {
+                    Id = a.Id,
+                    NomeCompleto = a.NomeCompleto,
+                    Email = a.Email,
+                    DataInicioAssinatura = a.DataInicioAssinatura,
+                    Plano = a.Plano,         
+                    ValorMensal = a.ValorMensal,
+                    Status = a.Status,       
+                    TempoDeAssinaturaEmMeses = a.TempoDeAssinaturaEmMeses
+                })
                 .ToListAsync();
 
-            // Adiciona o total no cabeçalho da resposta
             Response.Headers.Append("X-Total-Count", totalRegistros.ToString());
 
-            return Ok(assinantes);
+            return Ok(new { Total = totalRegistros, Assinantes = assinantes });
         }
 
         [HttpGet("{id:guid}")] // GET /assinantes/:id
         public async Task<IActionResult> ObterPorId(Guid id)
         {
-            var assinante = await _context.Assinantes
-                .FirstOrDefaultAsync(a => a.Id == id && a.Status == Status.Ativo);
+            var a = await _context.Assinantes.FirstOrDefaultAsync(x => x.Id == id && x.Status == Status.Ativo);
+            if (a == null) return NotFound($"Assinante ativo com ID {id} não encontrado.");
 
-            if (assinante == null) return NotFound($"Assinante ativo com ID {id} não encontrado.");
+            var response = new AssinanteResponseDTO {
+                Id = a.Id,
+                NomeCompleto = a.NomeCompleto,
+                Email = a.Email,
+                DataInicioAssinatura = a.DataInicioAssinatura,
+                Plano = a.Plano,
+                ValorMensal = a.ValorMensal,
+                Status = a.Status,
+                TempoDeAssinaturaEmMeses = a.TempoDeAssinaturaEmMeses
+            };
 
-            return Ok(assinante);
+            return Ok(response);
         }
 
         [HttpPatch("{id:guid}")] // PATCH /assinantes/:id
-        public async Task<IActionResult> UpdateParcial(Guid id, [FromBody] Assinante patchData)
+        public async Task<IActionResult> UpdateParcial(Guid id, [FromBody] AssinantePatchDTO dto)
         {
-            var assinante = await _context.Assinantes.FindAsync(id);
-            
-            if (assinante == null || assinante.Status != Status.Ativo) 
-                return NotFound("Assinante ativo não encontrado.");
+            var a = await _context.Assinantes.FindAsync(id);
+            if (a == null || a.Status != Status.Ativo) return NotFound();
 
-            // Atualiza apenas o que foi preenchido no JSON
-            if (!string.IsNullOrWhiteSpace(patchData.NomeCompleto)) 
-                assinante.NomeCompleto = patchData.NomeCompleto;
-                
-            if (!string.IsNullOrWhiteSpace(patchData.Email)) 
-            {
-                bool emailEmUso = await _context.Assinantes.AnyAsync(a => a.Email == patchData.Email && a.Id != id);
-                if (emailEmUso) return BadRequest("Este e-mail já está em uso.");
-                assinante.Email = patchData.Email;
+            if (!string.IsNullOrWhiteSpace(dto.NomeCompleto)) a.NomeCompleto = dto.NomeCompleto;
+            
+            if (!string.IsNullOrWhiteSpace(dto.Email)) {
+                if (await _context.Assinantes.AnyAsync(x => x.Email == dto.Email && x.Id != id))
+                    return BadRequest("E-mail já está em uso.");
+                a.Email = dto.Email;
             }
 
-            if (patchData.Plano != 0) 
-                assinante.Plano = patchData.Plano;
-                
-            if (patchData.ValorMensal > 0) 
-                assinante.ValorMensal = patchData.ValorMensal;
-
-            if (patchData.Status != 0) 
-                assinante.Status = patchData.Status;
-
-            if (patchData.DataInicioAssinatura != default)
-            {
-                if (patchData.DataInicioAssinatura > DateTime.UtcNow)
-                    return BadRequest("Data de início não pode ser futura.");
-                assinante.DataInicioAssinatura = patchData.DataInicioAssinatura;
+            if (dto.Plano.HasValue) a.Plano = dto.Plano.Value;
+            if (dto.ValorMensal.HasValue) a.ValorMensal = dto.ValorMensal.Value;
+            if (dto.Status.HasValue) a.Status = dto.Status.Value;
+            if (dto.DataInicioAssinatura.HasValue) {
+                if (dto.DataInicioAssinatura > DateTime.UtcNow) return BadRequest("Data futura.");
+                a.DataInicioAssinatura = dto.DataInicioAssinatura.Value;
             }
 
             await _context.SaveChangesAsync();

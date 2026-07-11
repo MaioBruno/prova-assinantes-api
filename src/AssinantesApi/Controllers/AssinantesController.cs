@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using AssinantesApi.Data;
-using AssinantesApi.Entities;
 using AssinantesApi.DTOs;
+using AssinantesApi.Services;
 
 namespace AssinantesApi.Controllers
 {
@@ -10,154 +8,98 @@ namespace AssinantesApi.Controllers
     [Route("assinantes")]
     public class AssinantesController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IAssinanteService _assinanteService;
 
-        public AssinantesController(AppDbContext context)
+        public AssinantesController(IAssinanteService assinanteService)
         {
-            _context = context;
+            _assinanteService = assinanteService;
         }
 
-        [HttpPost] // POST /assinantes
+        [HttpPost]
         public async Task<IActionResult> Criar([FromBody] AssinanteCreateDTO dto)
         {
-            // 1. Validar se o e-mail já existe (usando o DTO)
-            bool emailEmUso = await _context.Assinantes.AnyAsync(a => a.Email == dto.Email);
-            if (emailEmUso) return BadRequest("Este e-mail já está cadastrado no sistema.");
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-            // 2. Validar data (usando o DTO)
-            if (dto.DataInicioAssinatura > DateTime.UtcNow)
-                return BadRequest("A data de início da assinatura não pode ser maior que a data atual.");
-
-            // 3. Mapear DTO para Entidade
-            var assinante = new Assinante {
-                Id = Guid.NewGuid(), // Geramos o ID aqui na Entidade, não no DTO
-                NomeCompleto = dto.NomeCompleto,
-                Email = dto.Email,
-                DataInicioAssinatura = dto.DataInicioAssinatura,
-                Plano = dto.Plano,
-                ValorMensal = dto.ValorMensal,
-                Status = Status.Ativo // Definimos o padrão
-            };
-
-            // 4. Salvar
-            _context.Assinantes.Add(assinante);
-            await _context.SaveChangesAsync();
-
-            // 5. Retornar um ResponseDTO (boa prática não expor a entidade direto)
-            var response = new AssinanteResponseDTO {
-                Id = assinante.Id,
-                NomeCompleto = assinante.NomeCompleto,
-                Email = assinante.Email,
-                DataInicioAssinatura = assinante.DataInicioAssinatura,
-                Plano = assinante.Plano,
-                ValorMensal = assinante.ValorMensal,
-                Status = assinante.Status,
-                TempoDeAssinaturaEmMeses = assinante.TempoDeAssinaturaEmMeses
-            };
-
-            return CreatedAtAction(nameof(ObterPorId), new { id = assinante.Id }, response);
+            try
+            {
+                var resultado = await _assinanteService.CriarAsync(dto);
+                return CreatedAtAction(nameof(ObterPorId), new { id = resultado.Id }, resultado);
+            }
+            catch (ArgumentException ex) 
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
-        [HttpGet] // GET /assinantes
-        public async Task<IActionResult> ListarTodos(int page = 1, int size = 10)
+        [HttpGet]
+        public async Task<IActionResult> ListarTodos([FromQuery] int page = 1, [FromQuery] int size = 10)
         {
-            var query = _context.Assinantes.Where(a => a.Status == Status.Ativo);
-            // Conta o total antes de aplicar Skip/Take
-            int totalRegistros = await query.CountAsync();
-
-            // Validação simples para evitar valores negativos
-            if (page < 1) page = 1;
-            if (size < 1) size = 10;
-
-            var assinantes = await query
-                .OrderBy(a => a.NomeCompleto)
-                .Skip((page - 1) * size)
-                .Take(size)
-                .Select(a => new AssinanteResponseDTO {
-                    Id = a.Id,
-                    NomeCompleto = a.NomeCompleto,
-                    Email = a.Email,
-                    DataInicioAssinatura = a.DataInicioAssinatura,
-                    Plano = a.Plano,         
-                    ValorMensal = a.ValorMensal,
-                    Status = a.Status,       
-                    TempoDeAssinaturaEmMeses = a.TempoDeAssinaturaEmMeses
-                })
-                .ToListAsync();
-
-            Response.Headers.Append("X-Total-Count", totalRegistros.ToString());
-
-            return Ok(new { Total = totalRegistros, Assinantes = assinantes });
+            var (total, assinantes) = await _assinanteService.ListarTodosAsync(page, size);
+            
+            Response.Headers.Append("X-Total-Count", total.ToString());
+            
+            return Ok(new { Total = total, Page = page, Size = size, Assinantes = assinantes });
         }
 
-        [HttpGet("{id:guid}")] // GET /assinantes/:id
+        [HttpGet("{id:guid}")]
         public async Task<IActionResult> ObterPorId(Guid id)
         {
-            var a = await _context.Assinantes.FirstOrDefaultAsync(x => x.Id == id && x.Status == Status.Ativo);
-            if (a == null) return NotFound($"Assinante ativo com ID {id} não encontrado.");
+            var assinante = await _assinanteService.ObterPorIdAsync(id);
+            if (assinante == null)
+                return NotFound("Assinante não encontrado ou inativo.");
 
-            var response = new AssinanteResponseDTO {
-                Id = a.Id,
-                NomeCompleto = a.NomeCompleto,
-                Email = a.Email,
-                DataInicioAssinatura = a.DataInicioAssinatura,
-                Plano = a.Plano,
-                ValorMensal = a.ValorMensal,
-                Status = a.Status,
-                TempoDeAssinaturaEmMeses = a.TempoDeAssinaturaEmMeses
-            };
-
-            return Ok(response);
+            return Ok(assinante);
         }
 
-        [HttpPatch("{id:guid}")] // PATCH /assinantes/:id
+        [HttpPatch("{id:guid}")]
         public async Task<IActionResult> UpdateParcial(Guid id, [FromBody] AssinantePatchDTO dto)
         {
-            var a = await _context.Assinantes.FindAsync(id);
-            if (a == null || a.Status != Status.Ativo) return NotFound();
-
-            if (!string.IsNullOrWhiteSpace(dto.NomeCompleto)) a.NomeCompleto = dto.NomeCompleto;
-            
-            if (!string.IsNullOrWhiteSpace(dto.Email)) {
-                if (await _context.Assinantes.AnyAsync(x => x.Email == dto.Email && x.Id != id))
-                    return BadRequest("E-mail já está em uso.");
-                a.Email = dto.Email;
+            try
+            {
+                await _assinanteService.UpdateParcialAsync(id, dto);
+                return NoContent();
             }
-
-            if (dto.Plano.HasValue) a.Plano = dto.Plano.Value;
-            if (dto.ValorMensal.HasValue) a.ValorMensal = dto.ValorMensal.Value;
-            if (dto.Status.HasValue) a.Status = dto.Status.Value;
-            if (dto.DataInicioAssinatura.HasValue) {
-                if (dto.DataInicioAssinatura > DateTime.UtcNow) return BadRequest("Data futura.");
-                a.DataInicioAssinatura = dto.DataInicioAssinatura.Value;
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
             }
-
-            await _context.SaveChangesAsync();
-            return NoContent();
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
-        [HttpPatch("{id:guid}/desativar")] // PATCH /assinantes/:id/desativar
-        public async Task<IActionResult> Desativar(Guid id)
+        [HttpPatch("{id:guid}/desativar")]
+        public async Task<IActionResult> DesativarAssinante(Guid id)
         {
-            var assinante = await _context.Assinantes.FindAsync(id);
-            if (assinante == null) return NotFound("Assinante não encontrado.");
-
-            assinante.Status = Status.Inativo;
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            try
+            {
+                await _assinanteService.DesativarAsync(id);
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
-        [HttpDelete("{id:guid}")] // DELETE /assinantes/:id
+        [HttpDelete("{id:guid}")]
         public async Task<IActionResult> DeleteAssinante(Guid id)
         {
-            var assinante = await _context.Assinantes.FindAsync(id);
-            if (assinante == null) return NotFound($"Assinante com ID {id} não encontrado.");
-
-            _context.Assinantes.Remove(assinante);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            try
+            {
+                await _assinanteService.DeletarAsync(id);
+                return NoContent();
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
         }
     }
 }

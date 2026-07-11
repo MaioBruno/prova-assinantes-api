@@ -5,19 +5,39 @@ namespace AssinantesApi.Data
 {
     public class AppDbContext : DbContext
     {
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+        public AppDbContext(DbContextOptions<AppDbContext> options)
+            : base(options)
         {
         }
 
-        // Isso aqui cria a tabela no banco de dados baseada na sua classe Assinante
         public DbSet<Assinante> Assinantes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-        // Aqui resolvemos o aviso do 'ValorMensal'
-        modelBuilder.Entity<Assinante>()
-            .Property(a => a.ValorMensal)
-            .HasPrecision(18, 2); // Define: 18 dígitos totais, sendo 2 após a vírgula
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Assinante>(entity =>
+            {
+                entity.Property(a => a.ValorMensal)
+                      .HasPrecision(18, 2);
+
+                entity.HasIndex(a => a.Email)
+                      .IsUnique();
+
+                entity.Property(a => a.NomeCompleto)
+                      .IsRequired()
+                      .HasMaxLength(150);
+
+                entity.Property(a => a.Email)
+                      .IsRequired()
+                      .HasMaxLength(150);
+
+                entity.Property(a => a.Status)
+                      .HasConversion<int>();
+
+                entity.Property(a => a.Plano)
+                      .HasConversion<int>();
+            });
         }
     }
 }

@@ -1,29 +1,34 @@
 using Microsoft.EntityFrameworkCore;
 using AssinantesApi.Data;
+using AssinantesApi.Services; 
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Adiciona o suporte aos Controllers que criamos
-builder.Services.AddControllers(); 
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
-// Adiciona o motor da interface visual do Swagger
-builder.Services.AddEndpointsApiExplorer(); 
-builder.Services.AddSwaggerGen();           
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
-// Conecta ao Banco de Dados SQL Server
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddScoped<IAssinanteService, AssinanteService>();
+
 var app = builder.Build();
 
-// Configura o painel do Swagger apenas para o ambiente de desenvolvimento
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// Mapeia as rotas dos nossos Controllers
+app.UseHttpsRedirection();
+
 app.MapControllers();
 
 app.Run();

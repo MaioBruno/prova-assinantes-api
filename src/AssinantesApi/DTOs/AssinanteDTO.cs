@@ -1,18 +1,27 @@
 using AssinantesApi.Entities;
+using System.ComponentModel.DataAnnotations;
 
 namespace AssinantesApi.DTOs
 {
-    // Criar os campos obrigatórios iniciais
     public class AssinanteCreateDTO
     {
+        [Required]
         public string NomeCompleto { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
         public string Email { get; set; } = string.Empty;
+
+        [Required]
         public DateTime DataInicioAssinatura { get; set; }
+
+        [Required]
         public Plano Plano { get; set; }
+
+        [Required]
         public decimal ValorMensal { get; set; }
     }
 
-    // Atualização Parcial: campos opcionais (nullable)
     public class AssinantePatchDTO
     {
         public string? NomeCompleto { get; set; }
@@ -23,7 +32,6 @@ namespace AssinantesApi.DTOs
         public DateTime? DataInicioAssinatura { get; set; }
     }
 
-    // Exibe os dados para o usuário, incluindo o cálculo de tempo
     public class AssinanteResponseDTO
     {
         public Guid Id { get; set; }

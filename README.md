@@ -16,9 +16,8 @@ API REST desenvolvida em .NET para gerenciamento de assinantes, permitindo cadas
 ---
 
 ## 📁 Estrutura do Projeto
-
+```text
 AssinantesApi/
-│
 ├── Controllers/
 ├── Services/
 ├── Data/

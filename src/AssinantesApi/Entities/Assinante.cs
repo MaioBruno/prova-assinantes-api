@@ -1,59 +1,119 @@
-using System;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Text.Json.Serialization;
-using System.ComponentModel;
+using System.Text.RegularExpressions;
+using AssinantesApi.Enums;
 
 namespace AssinantesApi.Entities
 {
-    public enum Plano 
-    { 
-        Basico = 1, 
-        Padrao = 2, 
-        Premium = 3 
-    }
-    
-    public enum Status 
-    { 
-        Ativo = 1, 
-        Inativo = 2 
-    }
-
     public class Assinante
     {
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid Id { get; private set; }
 
-        [Required(ErrorMessage = "O nome completo é obrigatório.")]
-        public string NomeCompleto { get; set; } = string.Empty;
+        public string NomeCompleto { get; private set; } = string.Empty;
 
-        [Required(ErrorMessage = "O e-mail é obrigatório.")]
-        [EmailAddress(ErrorMessage = "O formato do e-mail é inválido.")]
-        public string Email { get; set; } = string.Empty;
+        public string Email { get; private set; } = string.Empty;
 
-        [Required(ErrorMessage = "A data de início é obrigatória.")]
-        public DateTime DataInicioAssinatura { get; set; }
+        public DateTime DataInicioAssinatura { get; private set; }
 
-        [Required]
-        public Plano Plano { get; set; }
+        public Plano Plano { get; private set; }
 
-        [Range(0.01, (double)decimal.MaxValue, ErrorMessage = "O valor mensal deve ser maior que 0.")]
-        [DefaultValue(49.90)]
-        public decimal ValorMensal { get; set; }
+        public decimal ValorMensal { get; private set; }
 
-        public Status Status { get; set; } = Status.Ativo;
+        public Status Status { get; private set; }
 
-        [NotMapped]
-        [JsonIgnore]
+        // 🔥 Propriedade calculada (domínio)
         public int TempoDeAssinaturaEmMeses
         {
             get
             {
                 var dataAtual = DateTime.UtcNow;
-                var meses = ((dataAtual.Year - DataInicioAssinatura.Year) * 12) 
+
+                var meses = ((dataAtual.Year - DataInicioAssinatura.Year) * 12)
                           + dataAtual.Month - DataInicioAssinatura.Month;
 
-                return meses <= 0 ? 1 : meses;
+                if (meses <= 0)
+                    throw new ArgumentException("O tempo de assinatura não pode ser zero.");
+
+                return meses;
             }
+        }
+
+        // 🔒 Construtor privado (DDD)
+        private Assinante() { }
+
+        // 🔥 Construtor principal com regras de negócio
+        public Assinante(
+            string nomeCompleto,
+            string email,
+            DateTime dataInicio,
+            Plano plano,
+            decimal valorMensal)
+        {
+            SetNome(nomeCompleto);
+            SetEmail(email);
+            SetDataInicio(dataInicio);
+            SetPlano(plano);
+            SetValorMensal(valorMensal);
+
+            Status = Status.Ativo;
+            Id = Guid.NewGuid();
+        }
+
+        // 🔥 Métodos de domínio (encapsulamento)
+
+        public void SetNome(string nome)
+        {
+            if (string.IsNullOrWhiteSpace(nome))
+                throw new ArgumentException("Nome completo é obrigatório.");
+
+            NomeCompleto = nome;
+        }
+
+        public void SetEmail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                throw new ArgumentException("Email é obrigatório.");
+
+            if (!Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+                throw new ArgumentException("Email inválido.");
+
+            Email = email;
+        }
+
+        public void SetDataInicio(DateTime dataInicio)
+        {
+            if (dataInicio > DateTime.UtcNow)
+                throw new ArgumentException("A data não pode ser futura.");
+
+            DataInicioAssinatura = dataInicio;
+        }
+
+        public void SetPlano(Plano plano)
+        {
+            Plano = plano;
+        }
+
+        public void SetValorMensal(decimal valor)
+        {
+            if (valor <= 0)
+                throw new ArgumentException("O valor mensal deve ser maior que zero.");
+
+            ValorMensal = valor;
+        }
+
+        public void Ativar()
+        {
+            if (Status == Status.Ativo)
+                throw new InvalidOperationException("Assinante já está ativo.");
+
+            Status = Status.Ativo;
+        }
+
+        public void Desativar()
+        {
+            if (Status == Status.Inativo)
+                throw new InvalidOperationException("Assinante já está inativo.");
+
+            Status = Status.Inativo;
+            ValorMensal = 0;
         }
     }
 }

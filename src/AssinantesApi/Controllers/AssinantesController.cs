@@ -26,7 +26,7 @@ namespace AssinantesApi.Controllers
                 var resultado = await _assinanteService.CriarAsync(dto);
                 return CreatedAtAction(nameof(ObterPorId), new { id = resultado.Id }, resultado);
             }
-            catch (ArgumentException ex) 
+            catch (ArgumentException ex)
             {
                 return BadRequest(ex.Message);
             }
@@ -36,9 +36,9 @@ namespace AssinantesApi.Controllers
         public async Task<IActionResult> ListarTodos([FromQuery] int page = 1, [FromQuery] int size = 10)
         {
             var (total, assinantes) = await _assinanteService.ListarTodosAsync(page, size);
-            
+
             Response.Headers.Append("X-Total-Count", total.ToString());
-            
+
             return Ok(new { Total = total, Page = page, Size = size, Assinantes = assinantes });
         }
 
@@ -46,6 +46,7 @@ namespace AssinantesApi.Controllers
         public async Task<IActionResult> ObterPorId(Guid id)
         {
             var assinante = await _assinanteService.ObterPorIdAsync(id);
+
             if (assinante == null)
                 return NotFound("Assinante não encontrado ou inativo.");
 
@@ -57,7 +58,7 @@ namespace AssinantesApi.Controllers
         {
             try
             {
-                await _assinanteService.UpdateParcialAsync(id, dto);
+                await _assinanteService.AtualizarParcialAsync(id, dto);
                 return NoContent();
             }
             catch (KeyNotFoundException ex)

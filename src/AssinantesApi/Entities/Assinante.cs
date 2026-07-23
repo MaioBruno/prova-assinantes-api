@@ -19,7 +19,6 @@ namespace AssinantesApi.Entities
 
         public Status Status { get; private set; }
 
-        // 🔥 Propriedade calculada (domínio)
         public int TempoDeAssinaturaEmMeses
         {
             get
@@ -29,17 +28,12 @@ namespace AssinantesApi.Entities
                 var meses = ((dataAtual.Year - DataInicioAssinatura.Year) * 12)
                           + dataAtual.Month - DataInicioAssinatura.Month;
 
-                if (meses <= 0)
-                    throw new ArgumentException("O tempo de assinatura não pode ser zero.");
-
-                return meses;
+                return meses < 0 ? 0 : meses; 
             }
         }
 
-        // 🔒 Construtor privado (DDD)
         private Assinante() { }
 
-        // 🔥 Construtor principal com regras de negócio
         public Assinante(
             string nomeCompleto,
             string email,
@@ -47,6 +41,8 @@ namespace AssinantesApi.Entities
             Plano plano,
             decimal valorMensal)
         {
+            Id = Guid.NewGuid();
+
             SetNome(nomeCompleto);
             SetEmail(email);
             SetDataInicio(dataInicio);
@@ -54,10 +50,8 @@ namespace AssinantesApi.Entities
             SetValorMensal(valorMensal);
 
             Status = Status.Ativo;
-            Id = Guid.NewGuid();
         }
 
-        // 🔥 Métodos de domínio (encapsulamento)
 
         public void SetNome(string nome)
         {
@@ -88,6 +82,9 @@ namespace AssinantesApi.Entities
 
         public void SetPlano(Plano plano)
         {
+            if (!Enum.IsDefined(typeof(Plano), plano))
+                throw new ArgumentException("Plano inválido.");
+
             Plano = plano;
         }
 

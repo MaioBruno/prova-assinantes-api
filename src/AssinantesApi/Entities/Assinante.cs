@@ -23,12 +23,13 @@ namespace AssinantesApi.Entities
         {
             get
             {
-                var dataAtual = DateTime.UtcNow;
+                var dataAtual = DateTime.UtcNow.Date;
+                var dataInicio = DataInicioAssinatura.Date;
 
-                var meses = ((dataAtual.Year - DataInicioAssinatura.Year) * 12)
-                          + dataAtual.Month - DataInicioAssinatura.Month;
+                var meses = ((dataAtual.Year - dataInicio.Year) * 12)
+                    + dataAtual.Month - dataInicio.Month;
 
-                return meses < 0 ? 0 : meses; 
+                return meses < 0 ? 0 : meses;
             }
         }
 
@@ -74,10 +75,19 @@ namespace AssinantesApi.Entities
 
         public void SetDataInicio(DateTime dataInicio)
         {
-            if (dataInicio > DateTime.UtcNow)
+            var dataAtual = DateTime.UtcNow.Date;
+            var dataInformada = dataInicio.Date;
+
+            if (dataInformada > dataAtual)
                 throw new ArgumentException("A data não pode ser futura.");
 
-            DataInicioAssinatura = dataInicio;
+            int meses = ((dataAtual.Year - dataInformada.Year) * 12)
+                + dataAtual.Month - dataInformada.Month;
+
+            if (meses <= 0)
+                throw new ArgumentException("O tempo de assinatura deve ser maior que zero.");
+
+            DataInicioAssinatura = dataInformada;
         }
 
         public void SetPlano(Plano plano)

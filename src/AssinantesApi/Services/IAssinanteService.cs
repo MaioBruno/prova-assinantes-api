@@ -8,7 +8,7 @@ namespace AssinantesApi.Services
 
         Task<(int Total, IEnumerable<AssinanteResponseDTO> Assinantes)> ListarTodosAsync(int page, int size);
 
-        Task<AssinanteResponseDTO?> ObterPorIdAsync(Guid id);
+        Task<AssinanteResponseDTO> ObterPorIdAsync(Guid id);
 
         Task AtualizarParcialAsync(Guid id, AssinantePatchDTO dto);
 

@@ -1,43 +1,69 @@
-using Microsoft.AspNetCore.Mvc.Testing;
-using System.Net;
-using Xunit;
+using Microsoft.AspNetCore.Mvc;
+using AssinantesApi.DTOs;
+using AssinantesApi.Services;
 
-namespace AssinantesApi.Tests.Controllers
+namespace AssinantesApi.Controllers
 {
-    public class AssinantesControllerTests : IClassFixture<WebApplicationFactory<Program>>
+    [ApiController]
+    [Route("assinantes")]
+    public class AssinantesController : ControllerBase
     {
-        private readonly WebApplicationFactory<Program> _factory;
+        private readonly IAssinanteService _assinanteService;
 
-        public AssinantesControllerTests(WebApplicationFactory<Program> factory)
+        public AssinantesController(IAssinanteService assinanteService)
         {
-            _factory = factory;
+            _assinanteService = assinanteService;
         }
 
-        [Fact]
-        public async Task Get_ListarTodos_DeveRetornarSucesso()
+        [HttpPost]
+        public async Task<IActionResult> Criar([FromBody] AssinanteCreateDTO dto)
         {
-            // Arrange
-            var client = _factory.CreateClient();
-
-            // Act
-            var response = await client.GetAsync("/assinantes");
-
-            // Assert
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var resultado = await _assinanteService.CriarAsync(dto);
+            return CreatedAtAction(nameof(ObterPorId), new { id = resultado.Id }, resultado);
         }
 
-        [Fact]
-        public async Task Post_CriarAssinante_RetornaBadRequest_QuandoDadosInvalidos()
+        [HttpGet]
+        public async Task<IActionResult> ListarTodos([FromQuery] int page = 1, [FromQuery] int size = 10)
         {
-            // Arrange
-            var client = _factory.CreateClient();
-            var content = new StringContent("{\"nomeCompleto\": \"\"}", System.Text.Encoding.UTF8, "application/json");
+            var (total, assinantes) = await _assinanteService.ListarTodosAsync(page, size);
 
-            // Act
-            var response = await client.PostAsync("/assinantes", content);
+            Response.Headers["X-Total-Count"] = total.ToString();
 
-            // Assert
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            return Ok(new
+            {
+                Total = total,
+                Page = page,
+                Size = size,
+                Assinantes = assinantes
+            });
+        }
+
+        [HttpGet("{id:guid}")]
+        public async Task<IActionResult> ObterPorId(Guid id)
+        {
+            var assinante = await _assinanteService.ObterPorIdAsync(id);
+            return Ok(assinante);
+        }
+
+        [HttpPatch("{id:guid}")]
+        public async Task<IActionResult> UpdateParcial(Guid id, [FromBody] AssinantePatchDTO dto)
+        {
+            await _assinanteService.AtualizarParcialAsync(id, dto);
+            return NoContent();
+        }
+
+        [HttpPatch("{id:guid}/desativar")]
+        public async Task<IActionResult> DesativarAssinante(Guid id)
+        {
+            await _assinanteService.DesativarAsync(id);
+            return NoContent();
+        }
+
+        [HttpDelete("{id:guid}")]
+        public async Task<IActionResult> DeleteAssinante(Guid id)
+        {
+            await _assinanteService.DeletarAsync(id);
+            return NoContent();
         }
     }
 }

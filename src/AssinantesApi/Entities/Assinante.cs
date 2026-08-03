@@ -81,10 +81,7 @@ namespace AssinantesApi.Entities
             if (dataInformada > dataAtual)
                 throw new ArgumentException("A data não pode ser futura.");
 
-            int meses = ((dataAtual.Year - dataInformada.Year) * 12)
-                + dataAtual.Month - dataInformada.Month;
-
-            if (meses <= 0)
+            if ((dataAtual - dataInformada).TotalDays < 30)
                 throw new ArgumentException("O tempo de assinatura deve ser maior que zero.");
 
             DataInicioAssinatura = dataInformada;

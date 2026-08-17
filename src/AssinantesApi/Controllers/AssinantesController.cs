@@ -59,6 +59,13 @@ namespace AssinantesApi.Controllers
             return NoContent();
         }
 
+        [HttpPatch("{id:guid}/ativar")]
+        public async Task<IActionResult> AtivarAssinante(Guid id)
+        {
+            await _assinanteService.AtivarAsync(id);
+            return NoContent();
+        }
+
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> DeleteAssinante(Guid id)
         {

@@ -31,7 +31,7 @@ AssinantesApi/
 ## ⚙️ Como executar o projeto
 
 1. Clonar o repositório
-git clone https://github.com/seu-repositorio/assinantes-api.git
+git clone https://github.com/MaioBruno/assinantes-api.git
 
 2. Configurar conexão no appsettings.json
 
@@ -126,13 +126,13 @@ Resposta:
 ## 🔢 Enumerações
 
 Status:
-- Ativo = 1
-- Inativo = 2
+- 1 = Ativo 
+- 2 = Inativo 
 
 Plano: 
-- Basico = 1
-- Padrao = 2
-- Premium = 3
+- 1 = Basico
+- 2 = Padrao 
+- 3 = Premium
 ---
 
 ## 🧠 Decisões Técnicas
@@ -140,9 +140,9 @@ Plano:
 - Uso de DTOs: Implementados para evitar a exposição direta das entidades do banco de dados na API, garantindo maior segurança e controle sobre o tráfego de dados de entrada e saída
 - Separação em Camadas: A lógica de negócio foi isolada em uma camada de Serviços (AssinanteService), removendo a responsabilidade dos Controllers. Isso facilita a manutenção, promove o princípio da Responsabilidade Única (SOLID) e viabiliza testes unitários isolados
 - Entity Framework Core: Escolhido como ORM pela sua robustez, integração nativa com o ecossistema .NET e facilidade na gestão de Migrations
-- Validações com Data Annotations: Utilizadas para garantir a integridade dos dados logo na entrada da requisição, devolvendo retornos HTTP 400 consistentes sem precisar sujar a lógica de negócio.
+- Validações com Data Annotations: utilizadas para validar os dados de entrada da API, como campos obrigatórios e formato de e-mail, garantindo que requisições inválidas sejam rejeitadas antes de chegarem à lógica de negócio. As regras específicas do domínio permanecem encapsuladas na entidade e na camada de serviço.
 - Paginação de Dados: Implementada no endpoint de listagem para garantir performance e escalabilidade, evitando sobrecarga de tráfego e memória ao retornar muitos registros.
-- Domínio Rico (Princípios de DDD): As lógicas intrínsecas à entidade, como o cálculo dinâmico de meses de assinatura e inicialização de IDs, foram encapsuladas no próprio modelo 'Assinante', evitando o antipadrão de modelo anêmico
+- Domínio Rico (princípios de DDD): as regras e comportamentos relacionados ao assinante foram encapsulados na própria entidade, como ativação, desativação, alteração de dados e validações de domínio, evitando concentrar as regras exclusivamente no Service.
 - Testes Automatizados: Implementação da pirâmide de testes cobrindo as regras das Entidades, a lógica do Service (com banco em memória) e o comportamento do Controller (Testes de Integração)
 
 ---

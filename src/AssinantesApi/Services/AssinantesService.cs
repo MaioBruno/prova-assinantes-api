@@ -104,6 +104,18 @@ namespace AssinantesApi.Services
             await _repository.SalvarAlteracoesAsync();
         }
 
+        public async Task AtivarAsync(Guid id)
+        {
+            var assinante = await _repository.ObterPorIdAsync(id);
+
+            if (assinante == null)
+                throw new KeyNotFoundException("Assinante não encontrado.");
+
+            assinante.Ativar();
+
+            await _repository.SalvarAlteracoesAsync();
+        }
+
         public async Task DeletarAsync(Guid id)
         {
             var assinante = await _repository.ObterPorIdAsync(id);

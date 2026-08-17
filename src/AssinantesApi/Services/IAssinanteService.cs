@@ -14,6 +14,8 @@ namespace AssinantesApi.Services
 
         Task DesativarAsync(Guid id);
 
+        Task AtivarAsync(Guid id);
+
         Task DeletarAsync(Guid id);
     }
 }

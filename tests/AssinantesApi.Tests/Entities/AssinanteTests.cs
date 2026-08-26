@@ -79,7 +79,7 @@ namespace AssinantesApi.Tests.Entities
 
         [Fact]
         public void Construtor_DeveLancarExcecao_QuandoTempoDeAssinaturaForMenorOuIgualAZero()
-        {
+        { 
             var ex = Assert.Throws<ArgumentException>(() =>
                 new Assinante(
                     "João Silva",
